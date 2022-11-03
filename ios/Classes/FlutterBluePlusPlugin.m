@@ -33,7 +33,6 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic, retain) NSObject<FlutterPluginRegistrar> *registrar;
 @property(nonatomic, retain) FlutterMethodChannel *channel;
 @property(nonatomic, retain) FlutterBluePlusStreamHandler *stateStreamHandler;
-@property(nonatomic, retain) CBCentralManager *centralManager;
 @property(nonatomic) NSMutableDictionary *scannedPeripherals;
 @property(nonatomic) NSMutableArray *servicesThatNeedDiscovered;
 @property(nonatomic) NSMutableArray *characteristicsThatNeedDiscovered;
@@ -41,24 +40,41 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @end
 
 @implementation FlutterBluePlusPlugin
-+ (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
-  FlutterMethodChannel* channel = [FlutterMethodChannel
+
++ (FlutterBluePlusPlugin *) shared {
+  return [FlutterBluePlusPlugin sharedPluginWithRegistrar:nil];
+}
+
++ (instancetype)sharedPluginWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar {
+  static FlutterBluePlusPlugin *instance;
+  static dispatch_once_t initToken;
+    dispatch_once(&initToken, ^{
+        instance = [[FlutterBluePlusPlugin alloc] init];
+    });
+    if (registrar) {
+      instance.registrar = registrar;
+      FlutterMethodChannel* channel = [FlutterMethodChannel
                                    methodChannelWithName:NAMESPACE @"/methods"
                                    binaryMessenger:[registrar messenger]];
-  FlutterEventChannel* stateChannel = [FlutterEventChannel eventChannelWithName:NAMESPACE @"/state" binaryMessenger:[registrar messenger]];
-  FlutterBluePlusPlugin* instance = [[FlutterBluePlusPlugin alloc] init];
-  instance.channel = channel;
-  instance.scannedPeripherals = [NSMutableDictionary new];
-  instance.servicesThatNeedDiscovered = [NSMutableArray new];
-  instance.characteristicsThatNeedDiscovered = [NSMutableArray new];
-  instance.logLevel = emergency;
+      instance.channel = channel;
+      FlutterEventChannel* stateChannel = [FlutterEventChannel eventChannelWithName:NAMESPACE @"/state" binaryMessenger:[registrar messenger]];
+      FlutterBluePlusPlugin* instance = [[FlutterBluePlusPlugin alloc] init];
+      instance.scannedPeripherals = [NSMutableDictionary new];
+      instance.servicesThatNeedDiscovered = [NSMutableArray new];
+      instance.characteristicsThatNeedDiscovered = [NSMutableArray new];
+      instance.logLevel = emergency;
 
-  // STATE
-  FlutterBluePlusStreamHandler* stateStreamHandler = [[FlutterBluePlusStreamHandler alloc] init];
-  [stateChannel setStreamHandler:stateStreamHandler];
-  instance.stateStreamHandler = stateStreamHandler;
+      // STATE
+      FlutterBluePlusStreamHandler* stateStreamHandler = [[FlutterBluePlusStreamHandler alloc] init];
+      [stateChannel setStreamHandler:stateStreamHandler];
+      instance.stateStreamHandler = stateStreamHandler;
+    }
+    return instance;
+}
 
-  [registrar addMethodCallDelegate:instance channel:channel];
++ (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
+  FlutterBluePlusPlugin *instance = [FlutterBluePlusPlugin sharedPluginWithRegistrar:registrar];
+  [registrar addMethodCallDelegate:instance channel:instance.channel];
 }
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
